@@ -1,1 +1,1 @@
-{"name":"deploy","author":"Vitaly Iegorov","version":"0.3.0","require":{"Compressor":"*.*.*"}}
+{"name":"samsonos/deploy","author":"Vitaly Iegorov","version":"0.3.0","require":{"Compressor":"*.*.*"}}
