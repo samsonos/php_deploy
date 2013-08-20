@@ -77,7 +77,7 @@ class Deploy extends Service
 					}
 	
 					// Углубимся в рекурсию
-					ftp_sync( $ftp, $full_path, $ts_hours );
+					$this->ftp_sync( $ftp, $full_path, $ts_hours );
 				}
 				else
 				{
@@ -120,7 +120,8 @@ class Deploy extends Service
 			// Закроем чтение папки
 			closedir($handle);
 		}
-	}
+	}	
+	
 	
 	/** Controller to perform deploy routine */
 	public function __BASE()
@@ -134,10 +135,12 @@ class Deploy extends Service
 	
 		// Разница во времени между сервером и локальной машиной
 		$ts_hours = 0;
-	
+		
+		$ftp = ftp_connect( $this->host );
+		
 		// Попытаемся подключиться к FTP
-		if( ($ftp = ftp_connect( $this->host )) && ftp_login( $ftp, $this->username, $this->password ))
-		{			
+		if( false !== ftp_login( $ftp, $this->username, $this->password ))		
+		{		
 			// Switch to passive mode
 			ftp_pasv( $ftp, true );
 	
@@ -162,7 +165,7 @@ class Deploy extends Service
 				}
 					
 				// Выполним сжатие сайта
-				$cmp = new samson\compressor\compressor();
+				$cmp = new \samson\compressor\Compressor();
 					
 				// Perform site compress
 				$cmp->compress( $this->php_version, true, true );
@@ -190,7 +193,7 @@ class Deploy extends Service
 				ftp_delete( $ftp, 'timezone.dat');
 	
 				// Выполним синхронизацию папок
-				ftp_sync( $ftp, $cmp->output, $ts_hours );
+				$this->ftp_sync( $ftp, $cmp->output, $ts_hours );
 			}
 			else e('Папка ## не существует на сервере', E_ERROR, $this->wwwroot );
 	
