@@ -22,16 +22,19 @@ class Deploy extends Service
 	protected $version = '0.3.0';
 	
 	/** FTP host */
-	public $host 	= 'samsonos.com';
+	public $host 	= '';
 	
-	/** Path to site document root */
-	public $wwwroot	= './vitaly/wwwroot/karnaval-costume.com/www/';
+	/** Path to site document root on remote server */
+	public $wwwroot	= '';
+	
+	/** Path to site document root on local server */
+	public $soureroot = '';
 	
 	/** FTP username */
-	public $username= 'vitaly';
+	public $username= '';
 	
 	/** FTP password */
-	public $password= 'Vital29121987';
+	public $password= '';
 	
 	/** PHP version on server */
 	public $php_version = '5.3.0';
@@ -164,23 +167,42 @@ class Deploy extends Service
 					}
 				}
 					
-				// Выполним сжатие сайта
-				$cmp = new \samson\compressor\Compressor();
-					
-				// Perform site compress
-				$cmp->compress( $this->php_version, true, true );
-					
-				// Установим правильный путь к дироектории на сервере
+				// If compressor module exists
+				if( class_exists( ns_classname( 'Compressor', 'samson\compressor'), false ) )
+				{
+					// Create Compressor instance
+					$cmp = & m('compressor');//new \samson\compressor\Compressor();
+						
+					// Perform site compress
+					$cmp->compress( $this->php_version, true, true );
+						
+					// Set local site document root
+					$this->soureroot = $cmp->output;
+				}
+				// If HTML module exists
+				else if( class_exists( ns_classname( 'HTMLGenerator', 'samson\html'), false ) )
+				{
+					// Create Compressor instance
+					$cmp = & m('html');
+						
+					// Perform site compress
+					$cmp->compress();
+						
+					// Set local site document root
+					$this->soureroot = $cmp->output;					
+				}
+				
+				// Установим правильный путь к директории на сервере
 				$this->wwwroot = ftp_pwd( $ftp );
 					
 				// Создадим файл пустышку на локальном сервере
-				file_put_contents( $cmp->output.'/'.'timezone.dat', '1', 0755 );
+				file_put_contents( $this->soureroot.'/'.'timezone.dat', '1', 0755 );
 					
 				// Создадим пустышку на сервере
-				if( ftp_put( $ftp, 'timezone.dat', $cmp->output.'/'.'timezone.dat', FTP_ASCII ) )
+				if( ftp_put( $ftp, 'timezone.dat', $this->soureroot.'/'.'timezone.dat', FTP_ASCII ) )
 				{
 					// Рассчитаем разницу вов времени модификации
-					$ts_dx = abs(filemtime( $cmp->output.'/'.'timezone.dat' ) - ftp_mdtm( $ftp, 'timezone.dat'));
+					$ts_dx = abs(filemtime( $this->soureroot.'/'.'timezone.dat' ) - ftp_mdtm( $ftp, 'timezone.dat'));
 						
 					// Получим разницу в часах между машинами
 					$ts_hours = floor($ts_dx / 3600) * 3600 + $ts_dx % 3600;
@@ -189,11 +211,11 @@ class Deploy extends Service
 				}
 					
 				// Удалим временный файл
-				unlink($cmp->output.'/'.'timezone.dat');
+				unlink($this->soureroot.'/'.'timezone.dat');
 				ftp_delete( $ftp, 'timezone.dat');
 	
 				// Выполним синхронизацию папок
-				$this->ftp_sync( $ftp, $cmp->output, $ts_hours );
+				$this->ftp_sync( $ftp, $this->soureroot, $ts_hours );
 			}
 			else e('Папка ## не существует на сервере', E_ERROR, $this->wwwroot );
 	
