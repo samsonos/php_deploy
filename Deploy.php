@@ -42,7 +42,7 @@ class Deploy extends Service
 	/** Список модулей от которых завист данный модуль */
 	protected $requirements = array
 	(			
-		'Compressor'
+		
 	);
 	
 	/**
