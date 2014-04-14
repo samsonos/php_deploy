@@ -40,10 +40,7 @@ class Deploy extends Service
 	public $php_version = '5.3.0';
 
 	/** Список модулей от которых завист данный модуль */
-	protected $requirements = array
-	(			
-		
-	);
+	protected $requirements = array('core');
 	
 	/**
 	 * Perform synchronizing folder via FTP connrection

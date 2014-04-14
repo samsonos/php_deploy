@@ -1,1 +1,1 @@
-{"name":"samsonos/deploy","author":"Vitaly Iegorov","version":"0.3.0","require":{}}
+{"name":"samsonos/deploy","author":"Vitaly Iegorov","version":"0.3.0","require":{"samsonos/core":"dev-master"},"license":"Open Software License (OSL) v 3.0","homepage":"http://samsonos.com/"}
