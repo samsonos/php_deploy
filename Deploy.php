@@ -165,7 +165,7 @@ class Deploy extends Service
 				}
 					
 				// If compressor module exists
-				if( class_exists( ns_classname( 'Compressor', 'samson\compressor'), false ) )
+				if( class_exists( ns_classname( 'Compressor', 'samsonos\compressor'), false ) )
 				{
 					// Create Compressor instance
 					$cmp = & m('compressor');//new \samson\compressor\Compressor();
