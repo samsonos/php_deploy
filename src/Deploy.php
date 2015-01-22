@@ -181,20 +181,41 @@ class Deploy extends Service
             return true;
         }
 
+        $this->log('Remote path [##] is not writable', $this->wwwroot);
+
         return false;
     }
 
+    /**
+     * Initialize module
+     * @param array $params
+     * @return bool
+     */
+    public function init(array $params = array())
+    {
+        // Check configuration
+        if (!isset($this->sourceroot{0})) {
+            $this->log('Local folder[##] is not specified', $sourceroot);
+            return false;
+        }
+
+        // Check configuration
+        if (!isset($this->sourceroot{0})) {
+            $this->log('Remote folder[##] is not specified', $wwwroot);
+            return false;
+        }
+
+        return parent::init($params);
+    }
+
+    /**
+     * Connect to remote
+     * @return bool True if we have successfully connected
+     */
     protected function connect()
     {
         // Установим ограничение на выполнение скрипта
         ini_set('max_execution_time', 120);
-
-        if (!isset($this->sourceroot{0})) {
-            $this->log('$sourceroot is not specified');
-            return false;
-        }
-
-        $this->title('Deploying project to '.$this->host);
 
         // Connect to remote
         $this->ftp = ftp_connect($this->host);
@@ -204,23 +225,17 @@ class Deploy extends Service
             // Switch to passive mode
             ftp_pasv($this->ftp, true);
 
-            if (!$this->isWritable()) {
-                $this->log('Remote path [##] is not writable', $this->wwwroot);
-
-                return false;
-            }
-
             // Go to root folder
-            if (ftp_chdir($this->ftp, $this->wwwroot)) {
+            if ($this->isWritable() && ftp_chdir($this->ftp, $this->wwwroot)) {
                 return true;
             } else {
                 $this->log('Remote folder[##] not found', $this->wwwroot);
 
                 return false;
             }
-        } else {
-            $this->log('Cannot login to remote server [##@##]', $this->username, $this->host);
         }
+
+        $this->log('Cannot login to remote server [##@##]', $this->username, $this->host);
 
         return false;
     }
@@ -229,6 +244,8 @@ class Deploy extends Service
     /** Controller to perform deploy routine */
     public function __BASE()
     {
+        $this->title('Deploying project to '.$this->host);
+
         s()->async(true);
 
         // Connect to remote
@@ -251,6 +268,8 @@ class Deploy extends Service
                 $this->sourceroot,
                 $this->getTimeDifference()
             );
+
+            $this->log('Congratulations! Project[##] has been successfully deployed to [##]', $this->sourceroot, $this->host);
         }
 
         // close the connection
