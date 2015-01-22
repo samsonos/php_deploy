@@ -17,6 +17,9 @@ class Deploy extends Service
     /** @var resource Remote connection  */
     protected $ftp;
 
+    /** @var array Collection of path names to be ignored */
+    public $ignorePath = array('cms');
+
     /** Path to site document root on local server */
     public $sourceroot = '';
 
@@ -77,7 +80,7 @@ class Deploy extends Service
     {
         $result = array();
         // Get all entries in path
-        foreach (array_diff(scandir($path), array('..', '.')) as $entry) {
+        foreach (array_diff(scandir($path), array_merge($this->ignorePath, array('..', '.'))) as $entry) {
             // Build full REAL path to entry
             $result[] = realpath($path . '/' . $entry);
         }
