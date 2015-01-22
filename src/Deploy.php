@@ -167,63 +167,90 @@ class Deploy extends Service
         return $diff;
     }
 
-    /** Controller to perform deploy routine */
-    public function __BASE()
+    /**
+     * Try to write to remote
+     * @return bool True if we can write to remote
+     */
+    protected function isWritable()
+    {
+        // Create temp file
+        $path = tempnam(sys_get_temp_dir(), 'test');
+
+        // Copy file to remote
+        if (ftp_put($this->ftp, 'timezone.dat', $path, FTP_ASCII)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    protected function connect()
     {
         // Установим ограничение на выполнение скрипта
         ini_set('max_execution_time', 120);
 
-        s()->async(true);
-
         if (!isset($this->sourceroot{0})) {
-            return $this->log('$sourceroot is not specified');
-        }
-
-        if (!isset($this->wwwroot{0})) {
-            return $this->log('$wwwroot is not specified');
+            $this->log('$sourceroot is not specified');
+            return false;
         }
 
         $this->title('Deploying project to '.$this->host);
 
         // Connect to remote
         $this->ftp = ftp_connect($this->host);
+
         // Login
         if (false !== ftp_login($this->ftp, $this->username, $this->password)) {
             // Switch to passive mode
             ftp_pasv($this->ftp, true);
 
+            if (!$this->isWritable()) {
+                $this->log('Remote path [##] is not writable', $this->wwwroot);
+
+                return false;
+            }
+
             // Go to root folder
             if (ftp_chdir($this->ftp, $this->wwwroot)) {
-                // If this is remote app - chdir to it
-                if (__SAMSON_REMOTE_APP) {
-                    $base = str_replace('/', '', __SAMSON_BASE__);
-
-                    // Попытаемся перейти/создать папку на сервере
-                    if (!@ftp_chdir($this->ftp, $base)) {
-                        // Создадим папку
-                        ftp_mkdir($this->ftp, $base);
-                        // Изменим режим доступа к папке
-                        ftp_chmod($this->ftp, 0755, $base);
-                        // Перейдем в неё
-                        ftp_chdir($this->ftp, $base);
-                    }
-                }
-
-                // Установим правильный путь к директории на сервере
-                $this->wwwroot = ftp_pwd($this->ftp);
-
-                $this->log('Entered remote folder [##]', $this->wwwroot);
-
-                // Выполним синхронизацию папок
-                $this->synchronize(
-                    $this->sourceroot,
-                    $this->getTimeDifference()
-                );
+                return true;
             } else {
                 $this->log('Remote folder[##] not found', $this->wwwroot);
+
+                return false;
             }
         } else {
-            $this->log('Cannot login to remote server [##@##]', $this->host, $this->username);
+            $this->log('Cannot login to remote server [##@##]', $this->username, $this->host);
+        }
+
+        return false;
+    }
+
+
+    /** Controller to perform deploy routine */
+    public function __BASE()
+    {
+        s()->async(true);
+
+        // Connect to remote
+        if ($this->connect()) {
+            // If this is remote app - chdir to it
+            if (__SAMSON_REMOTE_APP) {
+                $base = str_replace('/', '', __SAMSON_BASE__);
+
+                // Create folder
+                $this->mkDir($base);
+            }
+
+            // Установим правильный путь к директории на сервере
+            $this->wwwroot = ftp_pwd($this->ftp);
+
+            $this->log('Entered remote folder [##]', $this->wwwroot);
+
+            // Выполним синхронизацию папок
+            $this->synchronize(
+                $this->sourceroot,
+                $this->getTimeDifference()
+            );
         }
 
         // close the connection
