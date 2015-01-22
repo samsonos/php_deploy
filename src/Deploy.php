@@ -35,9 +35,6 @@ class Deploy extends Service
     /** FTP password */
     public $password= '';
 
-    /** PHP version on server */
-    public $php_version = '5.3.0';
-
     /**
      * Generic log function for further modification
      * @param string $message
