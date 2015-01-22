@@ -14,6 +14,9 @@ class Deploy extends Service
     /** Идентификатор модуля */
     protected $id = 'deploy';
 
+    /** @var resource Remote connection  */
+    protected $ftp;
+
     /** Path to site document root on local server */
     public $sourceroot = '';
 
@@ -33,6 +36,39 @@ class Deploy extends Service
     public $php_version = '5.3.0';
 
     /**
+     * Generic log function for further modification
+     * @param string $message
+     * @return mixed
+     */
+    protected function log($message)
+    {
+        // Get passed vars
+        $vars = func_get_args();
+        // Remove first message var
+        array_shift($vars);
+
+        // Render debug message
+        return trace(debug_parse_markers($message, $vars));
+    }
+
+    /**
+     * Create remote directory and get into it
+     * @param $path
+     */
+    protected function mkDir($path)
+    {
+        // Try get into this dir, maybe it already there
+        if (!@ftp_chdir($this->ftp, $path)) {
+            // Create dir
+            ftp_mkdir($this->ftp, $path);
+            // Change rights
+            ftp_chmod($this->ftp, 0755, $path);
+            // Go to it
+            ftp_chdir($this->ftp, $path);
+        }
+    }
+
+    /**
      * Get all entries in $path
      * @param string $path Folder path for listing
      * @return array Collection of entries int folder
@@ -50,90 +86,61 @@ class Deploy extends Service
 
     /**
      * Compare local file with remote file
-     * @param resource $ftp FTP connection instance
      * @param string $fullPath Full local file path
      * @param int $diff Time difference between computers
      * @param int $maxAge File maximum possible age
      * @return bool True if file is old and must be updated
      */
-    protected function isOld($ftp, $fullPath, $diff = 0, $maxAge = 1)
+    protected function isOld($fullPath, $diff = 0, $maxAge = 1)
     {
         // Read ftp file modification time and count age of file and check if it is valid
-        return (filemtime($fullPath) - (ftp_mdtm($ftp, basename($fullPath)) + $diff)) > $maxAge;
-    }
-
-    /**
-     * Generic log function for further modification
-     * @param string $message
-     * @return mixed
-     */
-    protected function log($message)
-    {
-        // Get passed vars
-        $vars = func_get_args();
-        // Remove first message var
-        array_shift($vars);
-
-        // Render debug message
-        return trace(debug_parse_markers($message, $vars));
+        return (filemtime($fullPath) - (ftp_mdtm($this->ftp, basename($fullPath)) + $diff)) > $maxAge;
     }
 
     /**
      * Perform synchronizing folder via FTP connection
-     * @param resource 	$ftp 		FTP connection instance
      * @param string 	$path       Local path for synchronizing
      * @param integer 	$diff	Timestamp for analyzing changes
      */
-    protected function synchronize($ftp, $path, $diff = 0)
+    protected function synchronize($path, $diff = 0)
     {
         $this->log('Synchronizing remote folder [##][##]', $path, $diff);
 
         // Check if we can read this path
         foreach ($this->directoryFiles($path) as $fullPath) {
             $fileName = basename($fullPath);
-            // If this is a file
-            if (!$this->isDir($fullPath)) {
-                // Check if file has to be updated
-                if ($this->isOld($ftp, $fullPath, $diff)) {
-                    $this->log('Uploading file [##]', $fullPath);
+            // If this is a folder
+            if ($this->isDir($fullPath)) {
+                // Try to create it
+                $this->mkDir($fileName);
 
-                    // Copy file to remote
-                    if (ftp_put($ftp, $fileName, $fullPath, FTP_BINARY)) {
-                        // Change rights
-                        ftp_chmod($ftp, 0755, $fileName);
+                // Go deeper in recursion
+                $this->synchronize($fullPath, $diff);
+            } elseif ($this->isOld($fullPath, $diff)) { // Check if file has to be updated
+                $this->log('Uploading file [##]', $fullPath);
 
-                        $this->log('-- Success [##]', $fullPath);
-                    } else {
-                        $this->log('-- Failed [##]', $fullPath);
-                    }
-                }
-            } else { // If this is a folder - go deeper in recursion
-                // Try get into this dir, maybe it already there
-                if (!@ftp_chdir($ftp, $fileName)) {
-                    // Create dir
-                    ftp_mkdir($ftp, $fileName);
+                // Copy file to remote
+                if (ftp_put($this->ftp, $fileName, $fullPath, FTP_BINARY)) {
                     // Change rights
-                    ftp_chmod($ftp, 0755, $fileName);
-                    // Go to it
-                    ftp_chdir($ftp, $fileName);
-                }
+                    ftp_chmod($this->ftp, 0755, $fileName);
 
-                // If this is a folder - go deeper in recursion
-                $this->synchronize($ftp, $fullPath, $diff);
+                    $this->log('-- Success [##]', $fullPath);
+                } else {
+                    $this->log('-- Failed [##]', $fullPath);
+                }
             }
         }
 
         // Go one level up
-        ftp_cdup($ftp);
+        ftp_cdup($this->ftp);
     }
 
     /**
      * Get time difference between servers
-     * @param resource $ftp Remote connection
      * @param string $tsFileName TS file name(timezone.dat)
      * @return float|int Time difference between servers
      */
-    protected function getTimeDifference($ftp, $tsFileName = 'timezone.dat')
+    protected function getTimeDifference($tsFileName = 'timezone.dat')
     {
         $diff = 0;
 
@@ -144,14 +151,14 @@ class Deploy extends Service
         file_put_contents($localPath, '1', 0755);
 
         // Copy file to remote
-        if (ftp_put($ftp, 'timezone.dat', $localPath, FTP_ASCII)) {
+        if (ftp_put($this->ftp, 'timezone.dat', $localPath, FTP_ASCII)) {
             // Get difference
-            $ts_dx = abs(filemtime($localPath) - ftp_mdtm($ftp, $tsFileName));
+            $diff = abs(filemtime($localPath) - ftp_mdtm($this->ftp, $tsFileName));
 
             // Convert to hours
-            $diff = floor($ts_dx / 3600) * 3600 + $ts_dx % 3600;
+            $diff = floor($diff / 3600) * 3600 + $diff % 3600;
 
-            ftp_delete($ftp, 'timezone.dat');
+            ftp_delete($this->ftp, $tsFileName);
         }
 
         // Удалим временный файл
@@ -159,7 +166,6 @@ class Deploy extends Service
 
         return $diff;
     }
-
 
     /** Controller to perform deploy routine */
     public function __BASE()
@@ -180,38 +186,36 @@ class Deploy extends Service
         $this->title('Deploying project to '.$this->host);
 
         // Connect to remote
-        $ftp = ftp_connect($this->host);
+        $this->ftp = ftp_connect($this->host);
         // Login
-        if (false !== ftp_login($ftp, $this->username, $this->password)) {
+        if (false !== ftp_login($this->ftp, $this->username, $this->password)) {
             // Switch to passive mode
-            ftp_pasv($ftp, true);
+            ftp_pasv($this->ftp, true);
 
             // Go to root folder
-            if (ftp_chdir($ftp, $this->wwwroot)) {
+            if (ftp_chdir($this->ftp, $this->wwwroot)) {
                 // If this is remote app - chdir to it
-                if ( __SAMSON_REMOTE_APP) {
+                if (__SAMSON_REMOTE_APP) {
                     $base = str_replace('/', '', __SAMSON_BASE__);
 
                     // Попытаемся перейти/создать папку на сервере
-                    if(!@ftp_chdir( $ftp, $base ))
-                    {
+                    if (!@ftp_chdir($this->ftp, $base)) {
                         // Создадим папку
-                        ftp_mkdir($ftp, $base );
+                        ftp_mkdir($this->ftp, $base);
                         // Изменим режим доступа к папке
-                        ftp_chmod( $ftp, 0755, $base );
+                        ftp_chmod($this->ftp, 0755, $base);
                         // Перейдем в неё
-                        ftp_chdir( $ftp, $base );
+                        ftp_chdir($this->ftp, $base);
                     }
                 }
 
                 // Установим правильный путь к директории на сервере
-                $this->wwwroot = ftp_pwd($ftp);
+                $this->wwwroot = ftp_pwd($this->ftp);
 
                 $this->log('Entered remote folder [##]', $this->wwwroot);
 
                 // Выполним синхронизацию папок
                 $this->synchronize(
-                    $ftp,
                     $this->sourceroot,
                     $this->getTimeDifference()
                 );
@@ -223,6 +227,6 @@ class Deploy extends Service
         }
 
         // close the connection
-        ftp_close($ftp);
+        ftp_close($this->ftp);
     }
 }
