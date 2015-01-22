@@ -269,7 +269,11 @@ class Deploy extends Service
                 $this->getTimeDifference()
             );
 
-            $this->log('Congratulations! Project[##] has been successfully deployed to [##]', $this->sourceroot, $this->host);
+            $this->log(
+                'Congratulations! Project[##] has been successfully deployed to [##]',
+                $this->sourceroot,
+                $this->host
+            );
         }
 
         // close the connection
