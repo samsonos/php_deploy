@@ -7,7 +7,6 @@ namespace tests;
  */
 class MainTest extends \PHPUnit_Framework_TestCase
 {
-
     /** Tests init */
     public function setUp()
     {
