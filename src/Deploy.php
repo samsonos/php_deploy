@@ -195,13 +195,13 @@ class Deploy extends Service
     {
         // Check configuration
         if (!isset($this->sourceroot{0})) {
-            $this->log('Local folder[##] is not specified', $sourceroot);
+            $this->log('Local folder[##] is not specified', $this->sourceroot);
             return false;
         }
 
         // Check configuration
         if (!isset($this->sourceroot{0})) {
-            $this->log('Remote folder[##] is not specified', $wwwroot);
+            $this->log('Remote folder[##] is not specified', $this->wwwroot);
             return false;
         }
 
