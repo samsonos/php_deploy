@@ -110,7 +110,7 @@ class Deploy extends Service
         foreach ($this->directoryFiles($path) as $fullPath) {
             $fileName = basename($fullPath);
             // If this is a folder
-            if ($this->isDir($fullPath)) {
+            if (is_dir($fullPath)) {
                 // Try to create it
                 $this->mkDir($fileName);
 
@@ -161,7 +161,7 @@ class Deploy extends Service
             ftp_delete($this->ftp, $tsFileName);
         }
 
-        // Удалим временный файл
+        // Remover
         unlink($localPath);
 
         return $diff;
@@ -227,6 +227,6 @@ class Deploy extends Service
         }
 
         // close the connection
-        ftp_close($this->ftp);
+        return ftp_close($this->ftp);
     }
 }
